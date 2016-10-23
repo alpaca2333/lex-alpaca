@@ -1,7 +1,6 @@
 #pragma once
 
 #include "stdafx.h"
-#include <iostream>
 
 class NFAEdge;
 class NFANode;
@@ -13,7 +12,7 @@ class NoSolidEdgeOutException;
 #define REPEAT_0_1 0
 #define REPEAT_1_N 1
 #define REPEAT_0_N 2
-#define SAFE_RELEASE(p) {delete p; p = 0;}
+#define SAFE_RELEASE(p) { if (p) delete p; p = 0; }
 
 typedef NFANode* PFANode;
 typedef NFAEdge* PFAEdge;
@@ -29,7 +28,7 @@ public:
     const char* what() { return message; }
 
 private:
-    char message[1024];
+    char message[2048];
 };
 
 class NFANode
@@ -59,9 +58,10 @@ public:
 
     std::string note = "";
 
-    void link(TransValue, NFANode*);
-
     NFA* context;
+
+    void link(TransValue, NFANode *);
+
 protected:
     static int maxnid;
 };
@@ -141,13 +141,15 @@ public:
 
     bool matches(const char* seq);
 
-    void setEndValue(EndType endValue);
+    void setEndType(EndType endValue);
 
     void addNode(NFANode *node);
 
     void addEdge(NFAEdge *edge);
 
     void printCurrState();
+
+    void giveUpResource();
 protected:
     static int lastOprLevel;
 

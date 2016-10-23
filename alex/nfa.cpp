@@ -18,7 +18,8 @@ bool contains(std::vector<NFANode *> &v, NFANode* value)
 }
 
 
-NFANode::NFANode(NFA* context) : context(context) {
+NFANode::NFANode(NFA* context) : context(context)
+{
     context->addNode(this);
 }
 
@@ -60,11 +61,13 @@ std::vector<NFANode *> NFANode::getPostNodes(TransValue transVal)
     return result;
 }
 
-void NFANode::link(TransValue transValue, NFANode* node) {
+void NFANode::link(TransValue transValue, NFANode* node)
+{
     this->edges.push_back(new NFAEdge(this->context, transValue, node));
 }
 
-NFAEdge::NFAEdge(NFA* context) : context(context){
+NFAEdge::NFAEdge(NFA* context) : context(context)
+{
     context->addEdge(this);
 }
 
@@ -132,12 +135,13 @@ std::vector<EndType> NFA::getEndValues()
     return result;
 }
 
-void NFA::setEndValue(EndType endValue)
+void NFA::setEndType(EndType endValue)
 {
     End->endType = endValue;
 }
 
-NFA::~NFA() {
+NFA::~NFA()
+{
     for (NFANode *node: nodeList)
     {
         SAFE_RELEASE(node);
@@ -148,15 +152,18 @@ NFA::~NFA() {
     }
 }
 
-void NFA::addNode(NFANode *node) {
+void NFA::addNode(NFANode *node)
+{
     nodeList.push_back(node);
 }
 
-void NFA::addEdge(NFAEdge *edge) {
+void NFA::addEdge(NFAEdge *edge)
+{
     edgeList.push_back(edge);
 }
 
-void NFA::computeClosure() {
+void NFA::computeClosure()
+{
     // compute a closure
     unsigned long lastSize;
     do
@@ -194,6 +201,7 @@ NFA* NFA::parallel(NFA *another, EndType endValue)
     this->Start = start;
     this->End = end;
 
+    another->giveUpResource();
     resetState();
     return this;
 }
@@ -233,16 +241,19 @@ NFA* NFA::repeat(int repeatMode)
     return this;
 }
 
-NFA* NFA::concat(NFA *another) {
+NFA* NFA::concat(NFA *another)
+{
     this->regex = "(" + this->regex + ")" + another->regex;
     this->End->link(0, another->Start);
     this->End = another->End;
 
+    another->giveUpResource();
     resetState();
     return this;
 }
 
-bool NFA::matches(const char *seq) {
+bool NFA::matches(const char *seq)
+{
     resetState();
     bool result = true;
     int i;
@@ -290,4 +301,9 @@ NFA::NFA(TransValue transValue)
     edge->destination = End;
     this->currStatus.clear();
     this->currStatus.push_back(Start);
+}
+
+void NFA::giveUpResource() {
+    nodeList.clear();
+    edgeList.clear();
 }

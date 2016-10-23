@@ -12,3 +12,4 @@
 #include <vector>
 #include <exception>
 #include <fstream>
+#include <stack>
