@@ -5,9 +5,9 @@
 #include "nfa.h"
 
 
-bool contains(std::vector<FANode *> &v, FANode* value)
+bool contains(std::vector<NFANode *> &v, NFANode* value)
 {
-    for (FANode* node: v)
+    for (NFANode* node: v)
     {
         if (node == value)
         {
@@ -18,18 +18,24 @@ bool contains(std::vector<FANode *> &v, FANode* value)
 }
 
 
-FANode::FANode(FA* context) : context(context) {
+NFANode::NFANode(NFA* context) : context(context) {
     context->addNode(this);
 }
 
-FANode::~FANode() { }
+NFANode::NFANode(NFA* context, EndType endValue) : context(context)
+{
+    this->endType = endValue;
+    context->addNode(this);
+}
 
-int FANode::maxnid = 0;
+NFANode::~NFANode() { }
+
+int NFANode::maxnid = 0;
 int NFA::lastOprLevel = 0;
 
-std::vector<FAEdge *> FANode::getEdges(TransValue transVal)
+std::vector<NFAEdge *> NFANode::getEdges(TransValue transVal)
 {
-    std::vector<FAEdge *> result;
+    std::vector<NFAEdge *> result;
     for (int i = 0; i < edges.size(); ++i)
     {
         if (this->edges[i] && this->edges[i]->value == transVal)
@@ -40,13 +46,13 @@ std::vector<FAEdge *> FANode::getEdges(TransValue transVal)
     return result;
 }
 
-std::vector<FANode *> FANode::getPostNodes(TransValue transVal)
+std::vector<NFANode *> NFANode::getPostNodes(TransValue transVal)
 {
-    std::vector<FANode *> result;
-    for (FAEdge* pEdge: getEdges(transVal))
+    std::vector<NFANode *> result;
+    for (NFAEdge* pEdge: getEdges(transVal))
     {
         result.push_back(pEdge->destination);
-        for (FAEdge* ppEdge: pEdge->destination->getEdges(0))
+        for (NFAEdge* ppEdge: pEdge->destination->getEdges(0))
         {
             result.push_back(ppEdge->destination);
         }
@@ -54,51 +60,45 @@ std::vector<FANode *> FANode::getPostNodes(TransValue transVal)
     return result;
 }
 
-FANode::FANode(FA* context, EndValue endValue) : context(context)
-{
-    this->endType = endValue;
-    context->addNode(this);
+void NFANode::link(TransValue transValue, NFANode* node) {
+    this->edges.push_back(new NFAEdge(this->context, transValue, node));
 }
 
-void FANode::link(TransValue transValue, FANode* node) {
-    this->edges.push_back(new FAEdge(this->context, transValue, node));
-}
-
-FAEdge::FAEdge(FA* context) : context(context){
+NFAEdge::NFAEdge(NFA* context) : context(context){
     context->addEdge(this);
 }
 
-FAEdge::~FAEdge()
+NFAEdge::~NFAEdge()
 {
     // TODO
 }
 
-FAEdge::FAEdge(FA* context, TransValue transValue) : context(context) {
+NFAEdge::NFAEdge(NFA* context, TransValue transValue) : context(context) {
     this->value = transValue;
     context->addEdge(this);
 }
 
-FAEdge::FAEdge(FA* context, TransValue transValue, FANode *destination) : FAEdge(context, transValue) {
+NFAEdge::NFAEdge(NFA* context, TransValue transValue, NFANode *destination) : NFAEdge(context, transValue) {
     this->context = context;
     this->destination = destination;
 }
 
-std::vector<FANode *> FA::getCurrStatus()
+std::vector<NFANode *> NFA::getCurrStatus()
 {
     return this->currStatus;
 }
 
 void NFA::transfer(int transVal) throw(NoSolidEdgeOutException)
 {
-    std::vector<FANode *> tmp;
-    for (FANode* pNode: this->currStatus)
+    std::vector<NFANode *> tmp;
+    for (NFANode* pNode: this->currStatus)
     {
         tmp.push_back(pNode);
     }
     this->currStatus.clear();
-    for (FANode *pNode: tmp)
+    for (NFANode *pNode: tmp)
     {
-        for (FANode *tmpNode: pNode->getPostNodes(transVal))
+        for (NFANode *tmpNode: pNode->getPostNodes(transVal))
         {
             this->currStatus.push_back(tmpNode);
         }
@@ -111,18 +111,18 @@ void NFA::transfer(int transVal) throw(NoSolidEdgeOutException)
     computeClosure();
 }
 
-void FA::printCurrState()
+void NFA::printCurrState()
 {
-    for (FANode * node: currStatus)
+    for (NFANode * node: currStatus)
     {
         printf("state: %d\ndescription: %s\n\n", node->nid, node->note.data());
     }
 }
 
-std::vector<EndValue> FA::getEndValues()
+std::vector<EndType> NFA::getEndValues()
 {
-    std::vector<EndValue> result;
-    for (FANode * node: currStatus)
+    std::vector<EndType> result;
+    for (NFANode * node: currStatus)
     {
         if (node->endType >= 0)
         {
@@ -132,45 +132,27 @@ std::vector<EndValue> FA::getEndValues()
     return result;
 }
 
-FA::FA()
-{
-    End = Start = new FANode(this, 0);
-    this->currStatus.push_back(Start);
-}
-
-FA::FA(TransValue transValue)
-{
-    this->regex = (char) transValue;
-    Start = new FANode(this);
-    End = new FANode(this);
-    FAEdge* edge = new FAEdge(this, transValue);
-    Start->edges.push_back(edge);
-    edge->destination = End;
-    this->currStatus.clear();
-    this->currStatus.push_back(Start);
-}
-
-void FA::setEndValue(EndValue endValue)
+void NFA::setEndValue(EndType endValue)
 {
     End->endType = endValue;
 }
 
-FA::~FA() {
-    for (FANode *node: nodeList)
+NFA::~NFA() {
+    for (NFANode *node: nodeList)
     {
         SAFE_RELEASE(node);
     }
-    for (FAEdge *edge: edgeList)
+    for (NFAEdge *edge: edgeList)
     {
         SAFE_RELEASE(edge);
     }
 }
 
-void FA::addNode(FANode *node) {
+void NFA::addNode(NFANode *node) {
     nodeList.push_back(node);
 }
 
-void FA::addEdge(FAEdge *edge) {
+void NFA::addEdge(NFAEdge *edge) {
     edgeList.push_back(edge);
 }
 
@@ -181,8 +163,8 @@ void NFA::computeClosure() {
     {
         for (int i = 0; i < currStatus.size(); ++i)
         {
-            FANode* pNode = currStatus[i];
-            for (FANode *tmpNode: pNode->getPostNodes(0))
+            NFANode* pNode = currStatus[i];
+            for (NFANode *tmpNode: pNode->getPostNodes(0))
             {
                 if (!contains(currStatus, tmpNode))
                     currStatus.push_back(tmpNode);
@@ -198,14 +180,14 @@ void NFA::resetState() {
     computeClosure();
 }
 
-NFA* NFA::parallel(NFA *another, EndValue endValue)
+NFA* NFA::parallel(NFA *another, EndType endValue)
 {
     this->regex = this->regex + "|" + another->regex;
 
-    FANode* start = new FANode(this);
+    NFANode* start = new NFANode(this);
     start->link(0, this->Start);
     start->link(0, another->Start);
-    FANode* end = new FANode(this, endValue);
+    NFANode* end = new NFANode(this, endValue);
     this->End->link(0, end);
     another->End->link(0, end);
 
@@ -231,8 +213,8 @@ NFA* NFA::repeat(int repeatMode)
         regex = "(" + regex + ")?";
     }
 
-    FANode *start = new FANode(this);
-    FANode *end = new FANode(this);
+    NFANode *start = new NFANode(this);
+    NFANode *end = new NFANode(this);
     start->link(0, this->Start);
     this->End->link(0, end);
     if (repeatMode == REPEAT_0_N || repeatMode == REPEAT_0_1)
@@ -282,7 +264,7 @@ bool NFA::matches(const char *seq) {
         return false;
     }
 
-    for (FANode* node: currStatus)
+    for (NFANode* node: currStatus)
     {
         if (node->endType > -1)
         {
@@ -290,4 +272,22 @@ bool NFA::matches(const char *seq) {
         }
     }
     return false;
+}
+
+NFA::NFA()
+{
+    End = Start = new NFANode(this, 0);
+    this->currStatus.push_back(Start);
+}
+
+NFA::NFA(TransValue transValue)
+{
+    this->regex = (char) transValue;
+    Start = new NFANode(this);
+    End = new NFANode(this);
+    NFAEdge* edge = new NFAEdge(this, transValue);
+    Start->edges.push_back(edge);
+    edge->destination = End;
+    this->currStatus.clear();
+    this->currStatus.push_back(Start);
 }

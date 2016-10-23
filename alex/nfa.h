@@ -3,8 +3,8 @@
 #include "stdafx.h"
 #include <iostream>
 
-class FAEdge;
-class FANode;
+class NFAEdge;
+class NFANode;
 class FA;
 class NFA;
 class DFA;
@@ -15,10 +15,10 @@ class NoSolidEdgeOutException;
 #define REPEAT_0_N 2
 #define SAFE_RELEASE(p) {delete p; p = 0;}
 
-typedef FANode* PFANode;
-typedef FAEdge* PFAEdge;
+typedef NFANode* PFANode;
+typedef NFAEdge* PFAEdge;
 typedef int TransValue;
-typedef int EndValue;
+typedef int EndType;
 
 /* thrown when no nodes can be reached under specified input */
 class NoSolidEdgeOutException : public std::exception
@@ -32,51 +32,51 @@ private:
     char message[1024];
 };
 
-class FANode
+class NFANode
 {
 public:
 
-    FANode(FA* context);
+    NFANode(NFA* context);
 
-    FANode(FA* context, EndValue);
+    NFANode(NFA* context, EndType);
 
-    virtual ~FANode();
+    virtual ~NFANode();
 
     const int nid = ++maxnid;
 
     /* edges that goes out of the node */
-    std::vector<FAEdge *> edges;
+    std::vector<NFAEdge *> edges;
 
-    std::vector<FAEdge *> getEdges(TransValue transVal);
+    std::vector<NFAEdge *> getEdges(TransValue transVal);
 
-    std::vector<FANode *> getPostNodes(TransValue transVal);
+    std::vector<NFANode *> getPostNodes(TransValue transVal);
 
     /* zero if it is a non-terminal node, else
      * a positive integer representing a specified
      * terminal status.
      */
-    EndValue endType = -1;
+    EndType endType = -1;
 
     std::string note = "";
 
-    void link(TransValue, FANode*);
+    void link(TransValue, NFANode*);
 
-    FA* context;
+    NFA* context;
 protected:
     static int maxnid;
 };
 
-class FAEdge
+class NFAEdge
 {
 public:
 
-    FAEdge(FA* context);
+    NFAEdge(NFA* context);
 
-    FAEdge(FA* context, TransValue transValue);
+    NFAEdge(NFA* context, TransValue transValue);
 
-    FAEdge(FA* context, TransValue transValue, FANode *destination);
+    NFAEdge(NFA* context, TransValue transValue, NFANode *destination);
 
-    virtual ~FAEdge();
+    virtual ~NFAEdge();
 
     /*
      * the value of the transporting character,
@@ -85,7 +85,7 @@ public:
     TransValue value;
 
     /* destination of the edges */
-    FANode* destination = NULL;
+    NFANode* destination = NULL;
 
     FA* context;
 };
@@ -93,56 +93,29 @@ public:
 class FA
 {
 public:
-    FA();
-
-    FA(TransValue transValue);
-
     std::string regex = "";
-
-    void printCurrState();
-
-    FANode* start() { return Start; }
-
-    FANode* end() { return End; }
-
-    EndValue endValue() { return End->endType; }
-
-    void setEndValue(EndValue endValue);
-
-    void addNode(FANode *node);
-
-    void addEdge(FAEdge *edge);
 
     /* make a transfer under the given value */
     virtual void transfer(int transVal) = 0;
 
     virtual bool matches(const char* seq) = 0;
 
-    virtual ~FA();
-protected:
-    FANode* Start = NULL;
-
-    FANode* End = NULL;
-
-    std::vector<FANode *> getCurrStatus();
-
-    std::vector<EndValue> getEndValues();
-
-    std::vector<FANode *> currStatus;
-
-    std::vector<FANode *> nodeList;
-
-    std::vector<FAEdge *> edgeList;
+    virtual ~FA() { };
 };
+
+
 
 class NFA : public FA
 {
 public:
-    NFA() : FA() { }
-    NFA(TransValue value) : FA(value) { }
+    NFA();
+
+    NFA(TransValue value);
+
+    ~NFA();
 
     /* use '|' to connect two NFAs in parallel */
-    NFA* parallel(NFA *, EndValue = -1);
+    NFA* parallel(NFA *, EndType = -1);
 
     /* use '?*+' to repeat an NFA */
     NFA* repeat(int repeatMode);
@@ -158,11 +131,40 @@ public:
      */
     void resetState();
 
+    NFANode* start() { return Start; }
+
+    NFANode* end() { return End; }
+
+    EndType endValue() { return End->endType; }
+
     void transfer(int transVal) throw(NoSolidEdgeOutException);
 
     bool matches(const char* seq);
 
+    void setEndValue(EndType endValue);
+
+    void addNode(NFANode *node);
+
+    void addEdge(NFAEdge *edge);
+
+    void printCurrState();
 protected:
     static int lastOprLevel;
+
+    NFANode* Start = NULL;
+
+    NFANode* End = NULL;
+
+    std::vector<NFANode *> getCurrStatus();
+
+    std::vector<EndType> getEndValues();
+
+    std::vector<NFANode *> currStatus;
+
+    std::vector<NFANode *> nodeList;
+
+    std::vector<NFAEdge *> edgeList;
 };
+
+
 
