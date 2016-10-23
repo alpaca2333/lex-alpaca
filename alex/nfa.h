@@ -13,7 +13,6 @@ class NoSolidEdgeOutException;
 #define REPEAT_0_1 0
 #define REPEAT_1_N 1
 #define REPEAT_0_N 2
-
 #define SAFE_RELEASE(p) {delete p; p = 0;}
 
 typedef FANode* PFANode;
@@ -25,7 +24,7 @@ typedef int EndValue;
 class NoSolidEdgeOutException : public std::exception
 {
 public:
-    NoSolidEdgeOutException(int invalidValue) { sprintf(message, "Cannot make a state transfer under character '\\%d(%c)'.", invalidValue, invalidValue); }
+    NoSolidEdgeOutException(int invalidValue) { sprintf(message, "Cannot make a state transfer under character '\\%o(%c)'.", invalidValue, invalidValue); }
 
     const char* what() { return message; }
 

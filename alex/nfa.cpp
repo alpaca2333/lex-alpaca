@@ -263,16 +263,22 @@ NFA* NFA::concat(NFA *another) {
 bool NFA::matches(const char *seq) {
     resetState();
     bool result = true;
+    int i;
     try
     {
-        for (int i = 0; i < strlen(seq); ++i)
+        for (i = 0; i < strlen(seq); ++i)
         {
             transfer(seq[i]);
         }
     }
     catch (NoSolidEdgeOutException& e)
     {
-        std::cerr << e.what() << std::endl;
+        std::cerr << e.what() << "\n";
+        std::cerr << seq << "\n";
+        for (int j = 0; j < i; ++j) {
+            std::cerr << ' ';
+        }
+        std::cerr << '^' << "\n";
         return false;
     }
 

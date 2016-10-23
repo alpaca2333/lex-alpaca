@@ -5,25 +5,26 @@ using namespace std;
 int main()
 {
     NFA fa('a');
-    cout << fa.regex << endl;
 
     fa.parallel(new NFA('b'));
-    cout << fa.regex << endl;
 
     fa.repeat(REPEAT_0_N);
-    cout << fa.regex << endl;
 
     fa.parallel(new NFA('c'));
-    cout << fa.regex << endl;
 
     fa.concat(new NFA('z'));
-    cout << fa.regex << endl;
 
+    /* assign a non-negative integer to endType
+     * to ensure the nfa considers itself finished
+     */
     fa.end()->endType = 1;
+
+
+    cout << fa.regex << endl;
 
     cout << fa.matches("b");
     cout << fa.matches("aaabz");
-    cout << fa.matches("cz");
-
+    cout << fa.matches("ccz");
+    cout << endl;
     return 0;
 }
