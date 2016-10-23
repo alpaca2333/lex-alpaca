@@ -81,8 +81,6 @@ public:
     /*
      * the value of the transporting character,
      * zero if it is epsilon.
-     *
-     * considering supporting unicode :P
      */
     TransValue value;
 
