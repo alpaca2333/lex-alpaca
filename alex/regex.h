@@ -44,6 +44,8 @@ public:
     void pushChar(char);
 
     NFA* getNFA() { return stkOpn.top(); }
+
+    std::string preCompile(const char*);
 protected:
 
     NFA* popOperand();

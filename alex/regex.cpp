@@ -176,3 +176,14 @@ void Regex::loadRegex(const char* re)
     }
 }
 
+std::string Regex::preCompile(const char* s)
+{
+    string a = s;
+    unsigned long dotPos;
+    while ((dotPos = a.find('.')) != string::npos)
+    {
+
+    }
+    return std::__cxx11::string();
+}
+

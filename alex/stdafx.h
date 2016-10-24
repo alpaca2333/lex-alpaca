@@ -13,3 +13,5 @@
 #include <exception>
 #include <fstream>
 #include <stack>
+#include <sstream>
+#include <functional>

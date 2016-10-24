@@ -31,6 +31,21 @@ private:
     char message[2048];
 };
 
+
+
+class InvalidNodeSeqException : public std::exception
+{
+public:
+    InvalidNodeSeqException(const char* invalidSeq) { strcpy(invalid, invalidSeq); }
+
+    const char* what() { return invalid; }
+private:
+    char invalid[12];
+};
+
+
+
+
 class NFANode
 {
 public:
@@ -60,7 +75,7 @@ public:
 
     NFA* context;
 
-    void link(TransValue, NFANode *);
+    void link(TransValue, NFANode*);
 
 protected:
     static int maxnid;
@@ -74,20 +89,39 @@ public:
 
     NFAEdge(NFA* context, TransValue transValue);
 
-    NFAEdge(NFA* context, TransValue transValue, NFANode *destination);
+    NFAEdge(NFA* context, TransValue transValue, NFANode* destination);
+
+    NFAEdge(NFA* context, const char* seq, NFANode* destination);
 
     virtual ~NFAEdge();
+
+    bool check(TransValue);
+
+    /* destination of the edges */
+    NFANode* destination = NULL;
+
+    FA* context;
+
+private:
+    std::function<bool(TransValue)> _check;
+
+    bool _dot(TransValue);
+
+    bool _range(TransValue);
+
+    bool _not(TransValue);
+
+    bool _single(TransValue);
+
+    TransValue range[2];
+
+    TransValue notList[128];
 
     /*
      * the value of the transporting character,
      * zero if it is epsilon.
      */
     TransValue value;
-
-    /* destination of the edges */
-    NFANode* destination = NULL;
-
-    FA* context;
 };
 
 class FA

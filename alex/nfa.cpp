@@ -39,7 +39,7 @@ std::vector<NFAEdge *> NFANode::getEdges(TransValue transVal)
     std::vector<NFAEdge *> result;
     for (int i = 0; i < edges.size(); ++i)
     {
-        if (this->edges[i] && this->edges[i]->value == transVal)
+        if (this->edges[i] && this->edges[i]->check(transVal))
         {
             result.push_back(this->edges[i]);
         }
@@ -68,7 +68,12 @@ void NFANode::link(TransValue transValue, NFANode* node)
 
 NFAEdge::NFAEdge(NFA* context) : context(context)
 {
+    this->value = 0;
     context->addEdge(this);
+    this->_check = [this](TransValue value)
+    {
+        return value == this->value;
+    };
 }
 
 NFAEdge::~NFAEdge()
@@ -79,11 +84,86 @@ NFAEdge::~NFAEdge()
 NFAEdge::NFAEdge(NFA* context, TransValue transValue) : context(context) {
     this->value = transValue;
     context->addEdge(this);
+    this->_check = [this](TransValue value)
+    {
+        return value == this->value;
+    };
 }
 
 NFAEdge::NFAEdge(NFA* context, TransValue transValue, NFANode *destination) : NFAEdge(context, transValue) {
+    this->destination = destination;
+}
+
+bool NFAEdge::_dot(TransValue c) {
+    return c != '\n';
+}
+
+bool NFAEdge::_range(TransValue c) {
+    return range[0] <= c && c <= range[1];
+}
+
+bool NFAEdge::_not(TransValue c) {
+    for (int i = 0; notList[i]; ++i) {
+        if (c == notList[i])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool NFAEdge::_single(TransValue c) {
+    return c == this->value;
+}
+
+
+NFAEdge::NFAEdge(NFA *context, const char *seq, NFANode* destination) {
     this->context = context;
     this->destination = destination;
+    if (!strcmp(seq, "."))
+    {
+        _check = [this](TransValue value)
+        {
+            return value != '\n';
+        };
+    }
+    else if (strlen(seq) == 3 && seq[1] == '-')
+    {
+        range[0] = seq[0];
+        range[1] = seq[2];
+        _check = [this](TransValue value)
+        {
+            return range[0] <= value && value <= range[1];
+        };
+    }
+    else if (strlen(seq) > 1 && seq[0] == '^')
+    {
+        int i;
+        for (i = 1; i < strlen(seq); ++i)
+        {
+            notList[i - 1] = seq[i];
+        }
+        notList[i] = 0;
+        _check =[this](TransValue value) -> bool
+        {
+            for (int j = 0; notList[j]; ++j) {
+                if (value == notList[j])
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+    }
+    else
+    {
+        throw InvalidNodeSeqException(seq);
+    }
+    context->addEdge(this);
+}
+
+bool NFAEdge::check(TransValue c) {
+    return _check(c);
 }
 
 std::vector<NFANode *> NFA::getCurrStatus()
