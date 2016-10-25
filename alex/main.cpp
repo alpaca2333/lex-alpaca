@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "nfa.h"
 #include "regex.h"
 using namespace std;
@@ -28,12 +29,13 @@ int main()
 //    cout << fa.matches("ccz");
 //    cout << endl;
 
-    Regex re("((a|b)c?d+)*$");
+    Regex re("[a-zA-Z_][a-zA-Z_0-9]*");
     NFA* nfa = re.getNFA();
 
-    nfa->setEndType(1);
-    cout << nfa->matches("acdddad") << endl;
-    cout << nfa->matches("acddda") << endl;
+    nfa->setEndType(1, 0);
+    cout << nfa->matches("a138917aa_ADA") << endl;
+    cout << nfa->matches("") << endl;
 
+    SAFE_RELEASE(nfa)
     return 0;
 }

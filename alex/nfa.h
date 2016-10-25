@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "stdafx.h"
 
 class NFAEdge;
@@ -8,6 +9,7 @@ class FA;
 class NFA;
 class DFA;
 class NoSolidEdgeOutException;
+class EndValueType;
 
 #define REPEAT_0_1 0
 #define REPEAT_1_N 1
@@ -17,7 +19,10 @@ class NoSolidEdgeOutException;
 typedef NFANode* PFANode;
 typedef NFAEdge* PFAEdge;
 typedef int TransValue;
-typedef int EndType;
+typedef EndValueType EndType;
+
+#define MIN_TRANSVALUE 32
+#define MAX_TRANSVALUE 127
 
 /* thrown when no nodes can be reached under specified input */
 class NoSolidEdgeOutException : public std::exception
@@ -31,7 +36,29 @@ private:
     char message[2048];
 };
 
+class EndValueType
+{
+public:
+    EndValueType() { }
 
+    EndValueType(const EndValueType&);
+
+    EndValueType& operator=(EndValueType&);
+
+    bool operator<(EndValueType&);
+
+    bool operator<=(EndValueType&);
+
+    bool operator==(EndValueType&);
+
+    bool operator>=(EndValueType&);
+
+    bool operator>(EndValueType&);
+
+    int value = -1;
+    int priority;
+    static int maxPriority;
+};
 
 class InvalidNodeSeqException : public std::exception
 {
@@ -43,16 +70,14 @@ private:
     char invalid[12];
 };
 
-
-
-
 class NFANode
 {
 public:
 
     NFANode(NFA* context);
 
-    NFANode(NFA* context, EndType);
+    /* create an NFANode with a single allowed value */
+    NFANode(NFA* context, TransValue);
 
     virtual ~NFANode();
 
@@ -63,19 +88,26 @@ public:
 
     std::vector<NFAEdge *> getEdges(TransValue transVal);
 
+    /* get the set of nodes that can reach under the given character */
     std::vector<NFANode *> getPostNodes(TransValue transVal);
+
+    /* set the node's end type */
+    void setEndType(int type);
 
     /* zero if it is a non-terminal node, else
      * a positive integer representing a specified
-     * terminal status.
-     */
-    EndType endType = -1;
+     * terminal status. */
+    EndType endType;
 
     std::string note = "";
 
     NFA* context;
 
+    /* link a node with a given value */
     void link(TransValue, NFANode*);
+
+    /* link a node with a given value set. See constructor of NFAEdge */
+    void link(const char* seq, NFANode*);
 
 protected:
     static int maxnid;
@@ -85,16 +117,34 @@ class NFAEdge
 {
 public:
 
+    /* create an edge with context. The context is the one responsible for
+     * releasing the edge */
     NFAEdge(NFA* context);
 
+    /* create the edge with the given value */
     NFAEdge(NFA* context, TransValue transValue);
 
+    /* create the edge with the given value and link it to the destination */
     NFAEdge(NFA* context, TransValue transValue, NFANode* destination);
 
+    /*
+     * Allows the follow format of sequence:
+     * - 'a-z'
+     * - '^abcdefghi'
+     * - 'abcdefghi'
+     */
     NFAEdge(NFA* context, const char* seq, NFANode* destination);
+
+    /* merge another edge to this one, which means merging the
+     * two edges' allowing values */
+    NFAEdge* merge(NFAEdge* another);
+
+    /* compute the complementary set of the allowing values */
+    NFAEdge *not_();
 
     virtual ~NFAEdge();
 
+    /* check if the given value is allowed by this edge */
     bool check(TransValue);
 
     /* destination of the edges */
@@ -102,26 +152,9 @@ public:
 
     FA* context;
 
+    std::vector<TransValue> allowedValues;
 private:
     std::function<bool(TransValue)> _check;
-
-    bool _dot(TransValue);
-
-    bool _range(TransValue);
-
-    bool _not(TransValue);
-
-    bool _single(TransValue);
-
-    TransValue range[2];
-
-    TransValue notList[128];
-
-    /*
-     * the value of the transporting character,
-     * zero if it is epsilon.
-     */
-    TransValue value;
 };
 
 class FA
@@ -132,6 +165,8 @@ public:
     /* make a transfer under the given value */
     virtual void transfer(int transVal) = 0;
 
+    /* returns a boolean indicating whether the sequence is
+     * accepted by the FA */
     virtual bool matches(const char* seq) = 0;
 
     virtual ~FA() { };
@@ -146,10 +181,15 @@ public:
 
     NFA(TransValue value);
 
+    NFA(const char* seq);
+
+    /* create the NFA with a single edge */
+    NFA(NFAEdge* edge);
+
     ~NFA();
 
     /* use '|' to connect two NFAs in parallel */
-    NFA* parallel(NFA *, EndType = -1);
+    NFA* parallel(NFA *, int = -1);
 
     /* use '?*+' to repeat an NFA */
     NFA* repeat(int repeatMode);
@@ -175,7 +215,7 @@ public:
 
     bool matches(const char* seq);
 
-    void setEndType(EndType endValue);
+    void setEndType(int endValue, int priority);
 
     void addNode(NFANode *node);
 
@@ -184,16 +224,19 @@ public:
     void printCurrState();
 
     void giveUpResource();
+
+    /* get the preferred endtype */
+    EndType getPreferredEndType();
+
+    /* get the list of all possible end type */
+    std::vector<EndType> getEndType();
 protected:
-    static int lastOprLevel;
 
     NFANode* Start = NULL;
 
     NFANode* End = NULL;
 
     std::vector<NFANode *> getCurrStatus();
-
-    std::vector<EndType> getEndValues();
 
     std::vector<NFANode *> currStatus;
 

@@ -23,16 +23,55 @@ NFANode::NFANode(NFA* context) : context(context)
     context->addNode(this);
 }
 
-NFANode::NFANode(NFA* context, EndType endValue) : context(context)
+NFANode::NFANode(NFA* context, int endValue) : context(context)
 {
-    this->endType = endValue;
+    this->setEndType(endValue);
     context->addNode(this);
 }
 
 NFANode::~NFANode() { }
 
 int NFANode::maxnid = 0;
-int NFA::lastOprLevel = 0;
+int EndValueType::maxPriority = 0;
+
+EndValueType::EndValueType(const EndValueType& another)
+{
+    this->value = another.value;
+    this->priority = another.priority;
+}
+
+EndValueType &EndValueType::operator=(EndValueType& another)
+{
+    this->priority = another.priority;
+    this->value = another.value;
+    return *this;
+}
+
+bool EndValueType::operator<(EndValueType& another)
+{
+    return this->priority < another.priority;
+}
+
+bool EndValueType::operator>(EndValueType& another)
+{
+    return this->priority > another.priority;
+}
+
+bool EndValueType::operator==(EndValueType& another)
+{
+    return this->priority == another.priority;
+}
+
+bool EndValueType::operator>=(EndValueType& another)
+{
+    return this->priority >= another.priority;
+}
+
+bool EndValueType::operator<=(EndValueType& another)
+{
+    return this->priority <= another.priority;
+}
+
 
 std::vector<NFAEdge *> NFANode::getEdges(TransValue transVal)
 {
@@ -66,14 +105,24 @@ void NFANode::link(TransValue transValue, NFANode* node)
     this->edges.push_back(new NFAEdge(this->context, transValue, node));
 }
 
+void NFANode::link(const char *seq, NFANode* node)
+{
+    this->edges.push_back(new NFAEdge(this->context, seq, node));
+}
+
+void NFANode::setEndType(int type)
+{
+    this->endType.value = type;
+    this->endType.priority = ++EndValueType::maxPriority;
+}
+
+
+
 NFAEdge::NFAEdge(NFA* context) : context(context)
 {
-    this->value = 0;
-    context->addEdge(this);
-    this->_check = [this](TransValue value)
-    {
-        return value == this->value;
-    };
+    if (context)
+        context->addEdge(this);
+    this->allowedValues.push_back(0);
 }
 
 NFAEdge::~NFAEdge()
@@ -81,90 +130,104 @@ NFAEdge::~NFAEdge()
     // TODO
 }
 
-NFAEdge::NFAEdge(NFA* context, TransValue transValue) : context(context) {
-    this->value = transValue;
-    context->addEdge(this);
-    this->_check = [this](TransValue value)
-    {
-        return value == this->value;
-    };
+NFAEdge::NFAEdge(NFA* context, TransValue transValue) : context(context)
+{
+    if (context)
+        context->addEdge(this);
+    this->allowedValues.push_back(transValue);
 }
 
 NFAEdge::NFAEdge(NFA* context, TransValue transValue, NFANode *destination) : NFAEdge(context, transValue) {
     this->destination = destination;
 }
 
-bool NFAEdge::_dot(TransValue c) {
-    return c != '\n';
-}
-
-bool NFAEdge::_range(TransValue c) {
-    return range[0] <= c && c <= range[1];
-}
-
-bool NFAEdge::_not(TransValue c) {
-    for (int i = 0; notList[i]; ++i) {
-        if (c == notList[i])
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool NFAEdge::_single(TransValue c) {
-    return c == this->value;
-}
-
-
-NFAEdge::NFAEdge(NFA *context, const char *seq, NFANode* destination) {
+NFAEdge::NFAEdge(NFA *context, const char *seq, NFANode* destination)
+{
     this->context = context;
     this->destination = destination;
     if (!strcmp(seq, "."))
     {
-        _check = [this](TransValue value)
-        {
-            return value != '\n';
-        };
+        for (TransValue i = MIN_TRANSVALUE; i <= MAX_TRANSVALUE; ++i) {
+            if (i != '\n')
+            {
+                allowedValues.push_back(i);
+            }
+        }
     }
     else if (strlen(seq) == 3 && seq[1] == '-')
     {
-        range[0] = seq[0];
-        range[1] = seq[2];
-        _check = [this](TransValue value)
+        for (int i = seq[0]; i <= seq[2]; ++i)
         {
-            return range[0] <= value && value <= range[1];
-        };
+            allowedValues.push_back(i);
+        }
     }
     else if (strlen(seq) > 1 && seq[0] == '^')
     {
-        int i;
-        for (i = 1; i < strlen(seq); ++i)
+        for (int i = MIN_TRANSVALUE; i <= MAX_TRANSVALUE; ++i)
         {
-            notList[i - 1] = seq[i];
-        }
-        notList[i] = 0;
-        _check =[this](TransValue value) -> bool
-        {
-            for (int j = 0; notList[j]; ++j) {
-                if (value == notList[j])
+            bool banned = false;
+            for (int j = 1; j < strlen(seq); ++j)
+            {
+                if (i == seq[j])
                 {
-                    return false;
+                    banned = true;
+                    break;
                 }
             }
-            return true;
-        };
+            if (!banned)
+            {
+                allowedValues.push_back(i);
+            }
+        }
     }
     else
     {
         throw InvalidNodeSeqException(seq);
     }
-    context->addEdge(this);
+    if (context)
+        context->addEdge(this);
 }
 
-bool NFAEdge::check(TransValue c) {
-    return _check(c);
+bool NFAEdge::check(TransValue c)
+{
+    for (TransValue value: allowedValues)
+    {
+        if (c == value)
+        {
+            return true;
+        }
+    }
+    return false;
 }
+
+NFAEdge *NFAEdge::merge(NFAEdge *another)
+{
+    for (TransValue value: another->allowedValues)
+    {
+        this->allowedValues.push_back(value);
+    }
+    return this;
+}
+
+NFAEdge *NFAEdge::not_()
+{
+    std::vector<TransValue> tmp = this->allowedValues;
+    this->allowedValues.clear();
+    for (TransValue i = MIN_TRANSVALUE; i <= MAX_TRANSVALUE; ++i)
+    {
+        this->allowedValues.push_back(i);
+        for (TransValue v: tmp)
+        {
+            if (v == i)
+            {
+                this->allowedValues.pop_back();
+                break;
+            }
+        }
+    }
+    return this;
+}
+
 
 std::vector<NFANode *> NFA::getCurrStatus()
 {
@@ -202,12 +265,12 @@ void NFA::printCurrState()
     }
 }
 
-std::vector<EndType> NFA::getEndValues()
+std::vector<EndType> NFA::getEndType()
 {
     std::vector<EndType> result;
     for (NFANode * node: currStatus)
     {
-        if (node->endType >= 0)
+        if (node->endType.value >= 0)
         {
             result.push_back(node->endType);
         }
@@ -215,9 +278,9 @@ std::vector<EndType> NFA::getEndValues()
     return result;
 }
 
-void NFA::setEndType(EndType endValue)
+void NFA::setEndType(int endValue, int priority)
 {
-    End->endType = endValue;
+    End->setEndType(endValue);
 }
 
 NFA::~NFA()
@@ -267,7 +330,7 @@ void NFA::resetState() {
     computeClosure();
 }
 
-NFA* NFA::parallel(NFA *another, EndType endValue)
+NFA* NFA::parallel(NFA *another, int endValue)
 {
     this->regex = this->regex + "|" + another->regex;
 
@@ -357,7 +420,7 @@ bool NFA::matches(const char *seq)
 
     for (NFANode* node: currStatus)
     {
-        if (node->endType > -1)
+        if (node->endType.value> -1)
         {
             return true;
         }
@@ -376,9 +439,17 @@ NFA::NFA(TransValue transValue)
     this->regex = (char) transValue;
     Start = new NFANode(this);
     End = new NFANode(this);
-    NFAEdge* edge = new NFAEdge(this, transValue);
-    Start->edges.push_back(edge);
-    edge->destination = End;
+    Start->link(transValue, End);
+    this->currStatus.clear();
+    this->currStatus.push_back(Start);
+}
+
+NFA::NFA(const char *seq) {
+    this->regex = seq;
+    this->regex = "[" + regex + "]";
+    Start = new NFANode(this);
+    End = new NFANode(this);
+    Start->link(seq, End);
     this->currStatus.clear();
     this->currStatus.push_back(Start);
 }
@@ -387,3 +458,26 @@ void NFA::giveUpResource() {
     nodeList.clear();
     edgeList.clear();
 }
+
+NFA::NFA(NFAEdge *edge)
+{
+    regex = "";
+    for (TransValue value: edge->allowedValues)
+    {
+        regex += (regex == "" ? "" : "|") + (char) value;
+    }
+    Start = new NFANode(this);
+    End = new NFANode(this);
+    Start->edges.push_back(edge);
+    edge->destination = End;
+    this->edgeList.push_back(edge);
+    resetState();
+}
+
+EndType NFA::getPreferredEndType()
+{
+    EndValueType a;
+    return a;
+}
+
+
