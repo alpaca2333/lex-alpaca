@@ -80,6 +80,7 @@ nfa->onTokenAccepted = [](int type, const char* token) -> void 	// a function po
 nfa->read("a123123+_zhe_shi_id");
 
 SAFE_RELEASE(nfa)
+SAFE_RELEASE(nfa2)
 return 0;
 ```
 The output should be:
