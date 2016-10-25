@@ -29,12 +29,24 @@ int main()
 //    cout << fa.matches("ccz");
 //    cout << endl;
 
-    Regex re("[a-zA-Z_][a-zA-Z_0-9]*");
-    NFA* nfa = re.getNFA();
+#define TOKEN_ID 1
+#define TOKEN_BLANK 2
 
-    nfa->setEndType(1, 0);
-    cout << nfa->matches("a138917aa_ADA") << endl;
-    cout << nfa->matches("") << endl;
+    Regex re("[a-zA-Z_][a-zA-Z_0-9]*");
+
+    NFA* nfa = re.getNFA();
+    NFA* nfa2 = new NFA(' ');
+    nfa->parallel(nfa2);
+
+    nfa->setEndType(TOKEN_ID, 1);
+    nfa2->setEndType(TOKEN_BLANK, 2);
+
+    nfa->onTokenAccepted = [](int type, const char* token) -> void
+    {
+        cout << token << endl;
+    };
+
+    nfa->read("a123123+_zhe_shi_id");
 
     SAFE_RELEASE(nfa)
     return 0;

@@ -5,7 +5,7 @@
 
 class NFAEdge;
 class NFANode;
-class FA;
+class IFA;
 class NFA;
 class DFA;
 class NoSolidEdgeOutException;
@@ -16,8 +16,6 @@ class EndValueType;
 #define REPEAT_0_N 2
 #define SAFE_RELEASE(p) { if (p) delete p; p = 0; }
 
-typedef NFANode* PFANode;
-typedef NFAEdge* PFAEdge;
 typedef int TransValue;
 typedef EndValueType EndType;
 
@@ -36,6 +34,8 @@ private:
     char message[2048];
 };
 
+class NotAcceptedStateException : public std::exception { };
+
 class EndValueType
 {
 public:
@@ -43,7 +43,7 @@ public:
 
     EndValueType(const EndValueType&);
 
-    EndValueType& operator=(EndValueType&);
+    EndValueType& operator=(const EndValueType &);
 
     bool operator<(EndValueType&);
 
@@ -56,8 +56,9 @@ public:
     bool operator>(EndValueType&);
 
     int value = -1;
+
+    /* a bigger number means a higher priority */
     int priority;
-    static int maxPriority;
 };
 
 class InvalidNodeSeqException : public std::exception
@@ -92,7 +93,7 @@ public:
     std::vector<NFANode *> getPostNodes(TransValue transVal);
 
     /* set the node's end type */
-    void setEndType(int type);
+    void setEndType(int type, int priority);
 
     /* zero if it is a non-terminal node, else
      * a positive integer representing a specified
@@ -150,18 +151,14 @@ public:
     /* destination of the edges */
     NFANode* destination = NULL;
 
-    FA* context;
+    IFA* context;
 
     std::vector<TransValue> allowedValues;
-private:
-    std::function<bool(TransValue)> _check;
 };
 
-class FA
+class IFA
 {
 public:
-    std::string regex = "";
-
     /* make a transfer under the given value */
     virtual void transfer(int transVal) = 0;
 
@@ -169,12 +166,18 @@ public:
      * accepted by the FA */
     virtual bool matches(const char* seq) = 0;
 
-    virtual ~FA() { };
+    virtual std::string regex() = 0;
+
+    virtual void setOnTokenAccepted(std::function<void(int type, const char* token)> cb) = 0;
+
+    virtual void setOnCharacterUnaccepted(std::function<void(char c, int position)> cb) = 0;
+
+    virtual ~IFA() { };
 };
 
 
 
-class NFA : public FA
+class NFA : public IFA
 {
 public:
     NFA();
@@ -225,11 +228,23 @@ public:
 
     void giveUpResource();
 
+    void read(const char* seq);
+
+    std::string regex() { return strRegex; }
+
     /* get the preferred endtype */
     EndType getPreferredEndType();
 
     /* get the list of all possible end type */
     std::vector<EndType> getEndType();
+
+    void setOnTokenAccepted(std::function<void(int type, const char* token)> cb);
+
+    void setOnCharacterUnaccepted(std::function<void(char c, int position)> cb);
+
+    std::function<void(int type, const char* token)> onTokenAccepted = [](int, const char*) { };
+
+    std::function<void(char c, int position)> onCharacterUnaccepted = [](char, int) { };
 protected:
 
     NFANode* Start = NULL;
@@ -243,6 +258,8 @@ protected:
     std::vector<NFANode *> nodeList;
 
     std::vector<NFAEdge *> edgeList;
+
+    std::string strRegex = "";
 };
 
 

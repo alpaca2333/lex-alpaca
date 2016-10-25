@@ -25,14 +25,13 @@ NFANode::NFANode(NFA* context) : context(context)
 
 NFANode::NFANode(NFA* context, int endValue) : context(context)
 {
-    this->setEndType(endValue);
+    this->setEndType(endValue, 0);
     context->addNode(this);
 }
 
 NFANode::~NFANode() { }
 
 int NFANode::maxnid = 0;
-int EndValueType::maxPriority = 0;
 
 EndValueType::EndValueType(const EndValueType& another)
 {
@@ -40,7 +39,7 @@ EndValueType::EndValueType(const EndValueType& another)
     this->priority = another.priority;
 }
 
-EndValueType &EndValueType::operator=(EndValueType& another)
+EndValueType &EndValueType::operator=(const EndValueType &another)
 {
     this->priority = another.priority;
     this->value = another.value;
@@ -49,12 +48,12 @@ EndValueType &EndValueType::operator=(EndValueType& another)
 
 bool EndValueType::operator<(EndValueType& another)
 {
-    return this->priority < another.priority;
+    return this->priority > another.priority;
 }
 
 bool EndValueType::operator>(EndValueType& another)
 {
-    return this->priority > another.priority;
+    return this->priority < another.priority;
 }
 
 bool EndValueType::operator==(EndValueType& another)
@@ -64,7 +63,7 @@ bool EndValueType::operator==(EndValueType& another)
 
 bool EndValueType::operator>=(EndValueType& another)
 {
-    return this->priority >= another.priority;
+    return this->priority <= another.priority;
 }
 
 bool EndValueType::operator<=(EndValueType& another)
@@ -110,10 +109,10 @@ void NFANode::link(const char *seq, NFANode* node)
     this->edges.push_back(new NFAEdge(this->context, seq, node));
 }
 
-void NFANode::setEndType(int type)
+void NFANode::setEndType(int type, int priority)
 {
     this->endType.value = type;
-    this->endType.priority = ++EndValueType::maxPriority;
+    this->endType.priority = priority;
 }
 
 
@@ -237,10 +236,7 @@ std::vector<NFANode *> NFA::getCurrStatus()
 void NFA::transfer(int transVal) throw(NoSolidEdgeOutException)
 {
     std::vector<NFANode *> tmp;
-    for (NFANode* pNode: this->currStatus)
-    {
-        tmp.push_back(pNode);
-    }
+    tmp = currStatus;
     this->currStatus.clear();
     for (NFANode *pNode: tmp)
     {
@@ -252,6 +248,7 @@ void NFA::transfer(int transVal) throw(NoSolidEdgeOutException)
 
     if (currStatus.size() == 0)
     {
+        currStatus = tmp;
         throw NoSolidEdgeOutException(transVal);
     }
     computeClosure();
@@ -280,7 +277,7 @@ std::vector<EndType> NFA::getEndType()
 
 void NFA::setEndType(int endValue, int priority)
 {
-    End->setEndType(endValue);
+    End->setEndType(endValue, priority);
 }
 
 NFA::~NFA()
@@ -332,7 +329,7 @@ void NFA::resetState() {
 
 NFA* NFA::parallel(NFA *another, int endValue)
 {
-    this->regex = this->regex + "|" + another->regex;
+    this->strRegex = this->strRegex + "|" + another->strRegex;
 
     NFANode* start = new NFANode(this);
     start->link(0, this->Start);
@@ -353,15 +350,15 @@ NFA* NFA::repeat(int repeatMode)
 {
     if (repeatMode == REPEAT_1_N)
     {
-        regex = "(" + regex + ")+";
+        strRegex = "(" + strRegex + ")+";
     }
     else if (repeatMode == REPEAT_0_N)
     {
-        regex = "(" + regex + ")*";
+        strRegex = "(" + strRegex + ")*";
     }
     else if (repeatMode == REPEAT_0_1)
     {
-        regex = "(" + regex + ")?";
+        strRegex = "(" + strRegex + ")?";
     }
 
     NFANode *start = new NFANode(this);
@@ -386,7 +383,7 @@ NFA* NFA::repeat(int repeatMode)
 
 NFA* NFA::concat(NFA *another)
 {
-    this->regex = "(" + this->regex + ")" + another->regex;
+    this->strRegex = "(" + this->strRegex + ")" + another->strRegex;
     this->End->link(0, another->Start);
     this->End = another->End;
 
@@ -420,7 +417,7 @@ bool NFA::matches(const char *seq)
 
     for (NFANode* node: currStatus)
     {
-        if (node->endType.value> -1)
+        if (node->endType.value > -1)
         {
             return true;
         }
@@ -436,7 +433,7 @@ NFA::NFA()
 
 NFA::NFA(TransValue transValue)
 {
-    this->regex = (char) transValue;
+    this->strRegex = (char) transValue;
     Start = new NFANode(this);
     End = new NFANode(this);
     Start->link(transValue, End);
@@ -445,8 +442,8 @@ NFA::NFA(TransValue transValue)
 }
 
 NFA::NFA(const char *seq) {
-    this->regex = seq;
-    this->regex = "[" + regex + "]";
+    this->strRegex = seq;
+    this->strRegex = "[" + strRegex + "]";
     Start = new NFANode(this);
     End = new NFANode(this);
     Start->link(seq, End);
@@ -461,10 +458,10 @@ void NFA::giveUpResource() {
 
 NFA::NFA(NFAEdge *edge)
 {
-    regex = "";
+    strRegex = "";
     for (TransValue value: edge->allowedValues)
     {
-        regex += (regex == "" ? "" : "|") + (char) value;
+        strRegex += (strRegex == "" ? "" : "|") + (char) value;
     }
     Start = new NFANode(this);
     End = new NFANode(this);
@@ -476,8 +473,72 @@ NFA::NFA(NFAEdge *edge)
 
 EndType NFA::getPreferredEndType()
 {
-    EndValueType a;
-    return a;
+    std::vector<EndType> ends = getEndType();
+    if (!ends.size())
+    {
+        throw NotAcceptedStateException();
+    }
+    EndType curr = ends[0];
+    for (int i = 1; i < ends.size(); ++i)
+    {
+        if (curr < ends[i])
+        {
+            curr = ends[i];
+        }
+    }
+    return curr;
 }
 
+void NFA::setOnTokenAccepted(std::function<void(int type, const char *token)> cb)
+{
+    this->onTokenAccepted = cb;
+}
 
+void NFA::setOnCharacterUnaccepted(std::function<void(char c, int position)> cb)
+{
+    this->onCharacterUnaccepted = cb;
+}
+
+void NFA::read(const char *seq)
+{
+    resetState();
+
+    std::string buf = "";
+    for (int i = 0; i < strlen(seq); ++i)
+    {
+        try
+        {
+            transfer(seq[i]);
+            buf += seq[i];
+        }
+        catch (NoSolidEdgeOutException&)
+        {
+            EndType endType;
+            try
+            {
+                endType = getPreferredEndType();
+            }
+            catch (NotAcceptedStateException&)
+            {
+                onCharacterUnaccepted(seq[i], i);
+                resetState();
+                continue;
+            }
+            --i;
+            onTokenAccepted(endType.value, buf.data());
+            buf = "";
+            resetState();
+        }
+    }
+
+    EndType endType;
+    try
+    {
+        endType = getPreferredEndType();
+    }
+    catch (NotAcceptedStateException&)
+    {
+        resetState();
+    }
+    onTokenAccepted(endType.value, buf.data());
+}

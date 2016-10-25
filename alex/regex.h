@@ -33,6 +33,8 @@ public:
 
 protected:
 
+    char lastChar = 0;
+
     bool inBracket = false;
 
     void pushOperand(NFA*);

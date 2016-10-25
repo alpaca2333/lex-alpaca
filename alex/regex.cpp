@@ -122,6 +122,8 @@ void Regex::pushOperator(char opr)
                 }
                 _push(opr);
                 break;
+            default:
+                break;
         }
     }
 }
@@ -199,7 +201,6 @@ void Regex::judgeInsert(char lastChar, char c)
 
 void Regex::pushChar(char c)
 {
-    static char lastChar = 0;
     judgeInsert(lastChar, c);
     if (c == '[')
     {
@@ -356,6 +357,9 @@ void Regex::loadRegex(const char* re)
     }
     if (re[i] != '$')
     {
+        // cleaning code should be here
+
+        lastChar = 0;
         pushChar('$');
     }
 }
