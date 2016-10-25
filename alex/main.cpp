@@ -35,7 +35,7 @@ int main()
     Regex re("[a-zA-Z_][a-zA-Z_0-9]*");
 
     NFA* nfa = re.getNFA();
-    NFA* nfa2 = new NFA(' ');
+    NFA* nfa2 = new NFA('+');
     nfa->parallel(nfa2);
 
     nfa->setEndType(TOKEN_ID, 1);
