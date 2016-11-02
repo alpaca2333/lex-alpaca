@@ -3,24 +3,30 @@
 
 #include "stdafx.h"
 
+#define interface class
+
+interface IEdge;
+interface IFA;
 class NFAEdge;
 class NFANode;
-class IFA;
 class NFA;
+class DFAEdge;
+class DFANode;
 class DFA;
 class NoSolidEdgeOutException;
 class EndValueType;
+class EdgeMap;
+
+typedef char TransValue;
+typedef EndValueType EndType;
 
 #define REPEAT_0_1 0
 #define REPEAT_1_N 1
 #define REPEAT_0_N 2
-#define SAFE_RELEASE(p) { if (p) delete p; p = 0; }
 
-typedef int TransValue;
-typedef EndValueType EndType;
 
 #define MIN_TRANSVALUE 32
-#define MAX_TRANSVALUE 127
+#define MAX_TRANSVALUE 126
 
 /* thrown when no nodes can be reached under specified input */
 class NoSolidEdgeOutException : public std::exception
@@ -59,6 +65,8 @@ public:
 
     /* a bigger number means a higher priority */
     int priority;
+
+    std::string name;
 };
 
 class InvalidNodeSeqException : public std::exception
@@ -78,7 +86,7 @@ public:
     NFANode(NFA* context);
 
     /* create an NFANode with a single allowed value */
-    NFANode(NFA* context, TransValue);
+    NFANode(NFA* context, int);
 
     virtual ~NFANode();
 
@@ -93,7 +101,7 @@ public:
     std::vector<NFANode *> getPostNodes(TransValue transVal);
 
     /* set the node's end type */
-    void setEndType(int type, int priority);
+    void setEndType(int type, int priority, std::string name);
 
     /* zero if it is a non-terminal node, else
      * a positive integer representing a specified
@@ -114,7 +122,13 @@ protected:
     static int maxnid;
 };
 
-class NFAEdge
+interface IEdge
+{
+public:
+    virtual bool check(TransValue) = 0;
+};
+
+class NFAEdge : public IEdge
 {
 public:
 
@@ -151,12 +165,37 @@ public:
     /* destination of the edges */
     NFANode* destination = NULL;
 
-    IFA* context;
+    NFA* context;
 
     std::vector<TransValue> allowedValues;
 };
 
-class IFA
+class DFAEdge : IEdge
+{
+public:
+
+    DFAEdge(DFA* context, std::vector<TransValue> allowedValues) : allowedValues(allowedValues), context(context) { init(); }
+
+    DFAEdge(DFA* context, DFANode* destination) : context(context), destination(destination) { init(); }
+
+    void init();
+
+    void addValue(TransValue);
+
+    void removeValue(TransValue);
+
+    bool check(TransValue value);
+
+    DFANode* destination;
+
+    std::vector<TransValue> allowedValues;
+private:
+
+    DFA* context;
+};
+
+
+interface IFA
 {
 public:
     /* make a transfer under the given value */
@@ -168,12 +207,63 @@ public:
 
     virtual std::string regex() = 0;
 
-    virtual void setOnTokenAccepted(std::function<void(int type, const char* token)> cb) = 0;
+    virtual void setOnTokenAccepted(std::function<void(int type, const char*, const char* token)> cb) = 0;
 
     virtual void setOnCharacterUnaccepted(std::function<void(char c, int position)> cb) = 0;
 
     virtual ~IFA() { };
 };
+
+
+class DFANode
+{
+public:
+    const int nid = ++maxnid;
+
+    DFANode(DFA* context) : context(context) { init(); }
+
+    void init();
+
+    DFAEdge* getEdge(TransValue value);
+
+    DFANode* getPostNode(TransValue value);
+
+    void link(DFAEdge* edge, DFANode* destination);
+
+    void link(TransValue value, DFANode* destination);
+
+    std::unordered_map<int, int> stateSet;
+protected:
+
+    EdgeMap* edges;
+
+    static int maxnid;
+
+    DFA* context;
+};
+
+
+class DFA : public IFA
+{
+public:
+    DFA(DFANode* start) { }
+
+    void addResource(DFANode* res);
+
+    void addResource(DFAEdge* res);
+
+    virtual ~DFA();
+
+    DFANode* start = NULL;
+
+    DFANode* getNode(std::vector<NFANode *>);
+private:
+
+    std::vector<DFANode *> nodeList;
+
+    std::vector<DFAEdge *> edgeList;
+};
+
 
 
 
@@ -218,11 +308,11 @@ public:
 
     bool matches(const char* seq);
 
-    void setEndType(int endValue, int priority);
+    void setEndType(int endValue, int priority, std::string name);
 
-    void addNode(NFANode *node);
+    void addResource(NFANode *node);
 
-    void addEdge(NFAEdge *edge);
+    void addResource(NFAEdge *edge);
 
     void printCurrState();
 
@@ -238,14 +328,21 @@ public:
     /* get the list of all possible end type */
     std::vector<EndType> getEndType();
 
-    void setOnTokenAccepted(std::function<void(int type, const char* token)> cb);
+    void setOnTokenAccepted(std::function<void(int type, const char*, const char* token)> cb);
 
     void setOnCharacterUnaccepted(std::function<void(char c, int position)> cb);
 
-    std::function<void(int type, const char* token)> onTokenAccepted = [](int, const char*) { };
+    std::function<void(int type, const char* description, const char* token)> onTokenAccepted = [](int, const char*, const char*) { };
 
     std::function<void(char c, int position)> onCharacterUnaccepted = [](char, int) { };
+
+    DFA* getDFA();
 protected:
+    void pushState();
+
+    void popState();
+
+    std::stack<std::vector<NFANode *>> stateStack;
 
     NFANode* Start = NULL;
 
@@ -263,4 +360,16 @@ protected:
 };
 
 
+class EdgeMap : protected std::unordered_map<TransValue, DFAEdge *>
+{
+public:
+    EdgeMap(DFA* context) : context(context) { }
 
+    void putEdge(TransValue value, DFANode* destination);
+
+    DFAEdge* getEdge(TransValue value) { return (*this)[value]; }
+private:
+    DFA* context;
+};
+
+bool nodeSetEquals(std::unordered_map<int, int>, std::unordered_map<int, int>);

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "stdafx.h"
-#include "nfa.h"
+#include "fa.h"
 
 class LackOperandException : public std::exception
 {

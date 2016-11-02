@@ -1,53 +1,30 @@
-#include <algorithm>
-#include "nfa.h"
+#include "fa.h"
+#include "script.h"
 #include "regex.h"
+
 using namespace std;
 
-int main()
+int main(int argc, char** argv)
 {
-
-//    NFA fa('a');
-//
-//    fa.parallel(new NFA('b'));
-//
-//    fa.repeat(REPEAT_0_N);
-//
-//    fa.parallel(new NFA('c'));
-//
-//    fa.concat(new NFA('z'));
-//
-//    /* assign a non-negative integer to endType
-//     * to ensure the nfa considers itself finished
-//     */
-//    fa.end()->endType = 1;
-//
-//
-//    cout << fa.regex << endl;
-//
-//    cout << fa.matches("b");
-//    cout << fa.matches("aaabz");
-//    cout << fa.matches("ccz");
-//    cout << endl;
-
-#define TOKEN_ID 1
-#define TOKEN_BLANK 2
-
-    Regex re("[a-zA-Z_][a-zA-Z_0-9]*");
-
-    NFA* nfa = re.getNFA();
-    NFA* nfa2 = new NFA('+');
-    nfa->parallel(nfa2);
-
-    nfa->setEndType(TOKEN_ID, 1);
-    nfa2->setEndType(TOKEN_BLANK, 2);
-
-    nfa->onTokenAccepted = [](int type, const char* token) -> void
+    if (argc < 3) cerr << "Expecting 2 params.\n ['*.l' file path] [to-be-scanned file path]" << endl;
+    ifstream *fin = new ifstream(argv[2]);
+    string content;
+    while(!fin->eof())
     {
-        cout << token << endl;
+        char line[65536];
+        fin->getline(line, 65536);
+        content += line;
+        content += " ";
+    }
+
+    Script script(argv[1]);
+    NFA* nfa = script.getNFA();
+    nfa->onTokenAccepted = [](int type, const char* desc, const char* token)
+    {
+        cout << desc << ":\t" << token << endl;
     };
+    nfa->read(content.data());
 
-    nfa->read("a123123+_zhe_shi_id");
 
-    SAFE_RELEASE(nfa)
     return 0;
 }

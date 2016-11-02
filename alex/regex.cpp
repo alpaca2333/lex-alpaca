@@ -2,7 +2,7 @@
 // Created by alpaca on 16-10-23.
 //
 
-#include "nfa.h"
+#include "fa.h"
 #include "regex.h"
 
 using namespace std;
@@ -116,7 +116,7 @@ void Regex::pushOperator(char opr)
                 _push(opr);
                 break;
             case '|':
-                if (stkEOpr.top() == '-')
+                if (!stkEOpr.empty() && stkEOpr.top() == '-')
                 {
                     _pop();
                 }
@@ -202,7 +202,7 @@ void Regex::judgeInsert(char lastChar, char c)
 void Regex::pushChar(char c)
 {
     judgeInsert(lastChar, c);
-    if (c == '[')
+    if (!inBracket && c == '[')
     {
         while (!stkEdge.empty()) stkEdge.pop();
         while (!stkEOpr.empty()) stkEOpr.pop();
